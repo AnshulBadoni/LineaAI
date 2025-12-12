@@ -115,7 +115,7 @@ export default function LandingPage() {
             <a href="#features" className="hover:text-stone-900 transition-colors">Features</a>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="#join" className="bg-stone-900 text-white text-xs font-bold px-5 py-2.5 rounded-full hover:bg-stone-800 transition-transform hover:scale-105 shadow-xl shadow-stone-900/10">Get Started</Link>
+            <Link href="/home" className="bg-stone-900 text-white text-xs font-bold px-5 py-2.5 rounded-full hover:bg-stone-800 transition-transform hover:scale-105 shadow-xl shadow-stone-900/10">Get Started</Link>
           </div>
         </div>
       </header>
@@ -146,7 +146,7 @@ export default function LandingPage() {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-            <Link href="#join" className="h-14 px-8 bg-stone-900 text-white rounded-full font-bold text-base flex items-center gap-3 shadow-xl shadow-stone-900/20 hover:shadow-stone-900/30 hover:-translate-y-1 transition-all">
+            <Link href="/home" className="h-14 px-8 bg-stone-900 text-white rounded-full font-bold text-base flex items-center gap-3 shadow-xl shadow-stone-900/20 hover:shadow-stone-900/30 hover:-translate-y-1 transition-all">
               Start Your Tree Free <Icons.Arrow />
             </Link>
             <div className="flex items-center gap-3 text-sm font-bold text-stone-600 hover:text-stone-900 cursor-pointer group px-6 h-14 rounded-full border border-transparent hover:border-stone-200 hover:bg-white transition-all">
