@@ -1,44 +1,60 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 
-// --- Icons (The "Good" Set) ---
+// --- Icons (The "Good" Set - Kept exactly as you liked) ---
 const Icons = {
   Leaf: () => <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.4142L17.4144 16.0001H12C12 16.0001 12 16.0001 12 15.9999V13.9999H17.4144C19.6235 13.9999 21.4144 12.2091 21.4144 9.99994V4.58572L16.0002 9.99994V11.9999H10.586C8.37682 11.9999 6.58596 13.7908 6.58596 15.9999V21.4142H12Z" opacity="0.8" /></svg>,
   Arrow: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>,
   Sparkles: () => <svg className="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 24 24"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>,
   Check: () => <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>,
-  Scan: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>,
   Play: () => <svg className="w-5 h-5 fill-stone-900 ml-1" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>,
-  Magic: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
+  Lock: () => <svg className="w-5 h-5 text-stone-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
+  Brain: () => <svg className="w-5 h-5 text-stone-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
 };
 
-// --- HIGH-FIDELITY MOCKUPS (Restoring the style you liked) ---
+// --- MOCKUPS (UPDATED CONTENT ONLY) ---
 
-const ChatMockup = () => (
+const RagChatMockup = () => (
   <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl shadow-stone-900/10 border border-stone-200 overflow-hidden relative z-10 transform transition-transform hover:-translate-y-2 duration-500 mx-auto rotate-[-2deg] hover:rotate-0">
     <div className="bg-stone-50/80 backdrop-blur border-b border-stone-100 p-4 flex items-center gap-3">
       <div className="w-8 h-8 rounded-full bg-stone-900 flex items-center justify-center text-white font-serif italic text-xs">L</div>
       <div>
-        <div className="text-xs font-bold text-stone-900">Linea Historian</div>
-        <div className="text-[10px] text-emerald-600 font-bold flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Active</div>
+        <div className="text-xs font-bold text-stone-900">Linea Assistant</div>
+        <div className="text-[10px] text-emerald-600 font-bold flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Context Ready</div>
       </div>
     </div>
     <div className="p-4 space-y-4">
-      <div className="flex gap-3">
-        <div className="bg-stone-100 text-stone-600 text-xs p-3 rounded-2xl rounded-tl-none leading-relaxed max-w-[85%]">
-          I found a 1920 Census record for <strong>Arthur Pendelton</strong>. He was a Carpenter living with his wife Eleanor.
+      {/* 1. User provides info */}
+      <div className="flex gap-3 justify-end">
+        <div className="bg-stone-100 text-stone-600 text-xs p-3 rounded-2xl rounded-tr-none leading-relaxed max-w-[85%] border border-stone-100">
+          My mother is Margaret. Her father was Arthur Pendleton, born in 1886.
         </div>
       </div>
+
+      {/* 2. AI Confirms */}
+      <div className="flex gap-3">
+        <div className="bg-white text-stone-400 text-[10px] uppercase font-bold tracking-wider py-1">
+          <Icons.Check /> Linked Arthur to Margaret.
+        </div>
+      </div>
+
+      {/* 3. User asks RAG question */}
       <div className="flex gap-3 justify-end">
         <div className="bg-stone-900 text-white text-xs p-3 rounded-2xl rounded-tr-none leading-relaxed max-w-[85%] shadow-md">
-          That's him! Who else was listed?
+          Who is my maternal granddad and when was he born?
         </div>
       </div>
+
+      {/* 4. AI Answers */}
       <div className="flex gap-3">
-        <div className="bg-stone-100 text-stone-600 text-xs p-3 rounded-2xl rounded-tl-none leading-relaxed max-w-[85%]">
-          Their daughter <strong>Margaret</strong> (Age 2). I've added them both to your tree.
+        <div className="bg-stone-100 text-stone-800 text-xs p-3 rounded-2xl rounded-tl-none leading-relaxed max-w-[90%] border border-stone-200 shadow-sm">
+          <div className="flex items-center gap-1 mb-1 text-amber-600 font-bold text-[9px] uppercase tracking-wider">
+            <Icons.Sparkles /> Answer
+          </div>
+          Your maternal grandfather is <strong>Arthur Pendleton</strong>. <br />
+          According to your previous notes, he was born in <strong>1886</strong>.
         </div>
       </div>
     </div>
@@ -47,7 +63,7 @@ const ChatMockup = () => (
 
 const TreeMockup = () => (
   <div className="relative flex flex-col items-center justify-center h-full py-10 scale-90 sm:scale-100">
-    {/* Connector Lines (CSS Only) */}
+    {/* Connector Lines */}
     <div className="absolute top-20 w-px h-16 bg-stone-300"></div>
     <div className="absolute top-[9rem] w-32 h-px bg-stone-300"></div>
     <div className="absolute top-[9rem] left-1/2 -translate-x-[4rem] w-px h-8 bg-stone-300"></div>
@@ -78,10 +94,13 @@ const TreeMockup = () => (
 // --- Main Page ---
 
 export default function LandingPage() {
+  const [email, setEmail] = useState("");
+  const [joined, setJoined] = useState(false);
+
   return (
     <div className="min-h-screen bg-stone-50 font-sans text-stone-900 selection:bg-amber-100 overflow-x-hidden">
 
-      {/* Texture Overlay (Crucial for the "Finished" look) */}
+      {/* Texture Overlay (Kept exactly as original) */}
       <div className="fixed inset-0 pointer-events-none z-50 opacity-[0.04] mix-blend-multiply" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}></div>
 
       {/* --- HEADER --- */}
@@ -92,12 +111,11 @@ export default function LandingPage() {
             <span className="font-serif font-bold tracking-tight text-lg">Linea</span>
           </div>
           <div className="hidden md:flex items-center gap-8 text-xs font-bold uppercase tracking-wider text-stone-500">
-            <a href="#features" className="hover:text-stone-900 transition-colors">How it works</a>
-            <a href="#pricing" className="hover:text-stone-900 transition-colors">Pricing</a>
+            <a href="#how-it-works" className="hover:text-stone-900 transition-colors">How it works</a>
+            <a href="#features" className="hover:text-stone-900 transition-colors">Features</a>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/people" className="hidden sm:block text-xs font-bold text-stone-900 hover:text-amber-700">Sign In</Link>
-            <Link href="/people" className="bg-stone-900 text-white text-xs font-bold px-5 py-2.5 rounded-full hover:bg-stone-800 transition-transform hover:scale-105">Get Started</Link>
+            <Link href="#join" className="bg-stone-900 text-white text-xs font-bold px-5 py-2.5 rounded-full hover:bg-stone-800 transition-transform hover:scale-105 shadow-xl shadow-stone-900/10">Get Started</Link>
           </div>
         </div>
       </header>
@@ -112,7 +130,7 @@ export default function LandingPage() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 bg-white border border-stone-200 px-3 py-1 rounded-full shadow-sm animate-fade-in-up">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wide">AI Historian 2.0 Live</span>
+            <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wide">Alpha Release</span>
           </div>
 
           {/* Headline */}
@@ -123,12 +141,12 @@ export default function LandingPage() {
 
           {/* Subtitle */}
           <p className="text-lg md:text-xl text-stone-500 max-w-2xl mx-auto leading-relaxed font-medium">
-            Stop wrestling with complex genealogy forms. Just chat with Linea to turn your scattered photos and stories into a living family tree.
+            Stop wrestling with complex genealogy forms. Just chat with Linea to find relationships into a living family tree.
           </p>
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-            <Link href="/people" className="h-14 px-8 bg-stone-900 text-white rounded-full font-bold text-base flex items-center gap-3 shadow-xl shadow-stone-900/20 hover:shadow-stone-900/30 hover:-translate-y-1 transition-all">
+            <Link href="#join" className="h-14 px-8 bg-stone-900 text-white rounded-full font-bold text-base flex items-center gap-3 shadow-xl shadow-stone-900/20 hover:shadow-stone-900/30 hover:-translate-y-1 transition-all">
               Start Your Tree Free <Icons.Arrow />
             </Link>
             <div className="flex items-center gap-3 text-sm font-bold text-stone-600 hover:text-stone-900 cursor-pointer group px-6 h-14 rounded-full border border-transparent hover:border-stone-200 hover:bg-white transition-all">
@@ -139,28 +157,27 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* --- CLARITY SECTION: What exactly is this? --- */}
-      {/* Uses the nice "FeatureSection" layout but explains the core mechanic: Input -> AI -> Output */}
-      <section id="features" className="px-4 pb-20">
+      {/* --- HOW IT WORKS (Updated Copy for RAG) --- */}
+      <section id="how-it-works" className="px-4 pb-20">
         <div className="max-w-6xl mx-auto space-y-24">
 
-          {/* Step 1: The Input (Chat) */}
+          {/* Step 1: The Input (RAG) */}
           <div className="flex flex-col md:flex-row items-center gap-12 md:gap-20">
             <div className="flex-1 space-y-6 text-center md:text-left">
               <span className="inline-block px-3 py-1 rounded-full bg-stone-100 border border-stone-200 text-stone-600 text-xs font-bold uppercase tracking-widest">Step 01</span>
-              <h2 className="text-4xl font-serif font-bold text-stone-900">It starts with a conversation.</h2>
+              <h2 className="text-4xl font-serif font-bold text-stone-900">Don't Search. Just Ask.</h2>
               <p className="text-lg text-stone-600 leading-relaxed">
-                Don't know dates? No problem. Tell Linea stories like "Grandma lived in Ohio during the war," or upload a photo of an old letter. We extract the facts for you.
+                Add family members naturally by telling Linea about them. Then, ask anything: "Who is my maternal granddad?", "When was he born?", or "Who are my cousins?"
               </p>
               <ul className="space-y-2 text-stone-500 font-medium text-sm">
-                <li className="flex items-center gap-2 justify-center md:justify-start"><Icons.Check /> Natural language understanding</li>
-                <li className="flex items-center gap-2 justify-center md:justify-start"><Icons.Check /> Upload handwriting & docs</li>
+                <li className="flex items-center gap-2 justify-center md:justify-start"><Icons.Check /> RAG-powered knowledge base</li>
+                <li className="flex items-center gap-2 justify-center md:justify-start"><Icons.Check /> Natural language input</li>
               </ul>
             </div>
             <div className="flex-1 w-full flex justify-center md:justify-end relative">
-              {/* Use the Nice Chat Mockup */}
+              {/* Updated RAG Chat Mockup */}
               <div className="relative z-10">
-                <ChatMockup />
+                <RagChatMockup />
                 {/* Decorative elements */}
                 <div className="absolute -top-6 -right-6 w-20 h-20 bg-amber-100 rounded-full blur-xl -z-10"></div>
               </div>
@@ -173,7 +190,7 @@ export default function LandingPage() {
               <span className="inline-block px-3 py-1 rounded-full bg-stone-100 border border-stone-200 text-stone-600 text-xs font-bold uppercase tracking-widest">Step 02</span>
               <h2 className="text-4xl font-serif font-bold text-stone-900">Your history, visualized.</h2>
               <p className="text-lg text-stone-600 leading-relaxed">
-                The AI instantly connects the dots, building an interactive family graph. Zoom out to see centuries, or zoom in to see the smile on your great-grandmother's face.
+                As you chat, the AI instantly connects the dots, building an interactive family graph. Zoom out to see centuries, or zoom in to see the smile on your great-grandmother's face.
               </p>
               <ul className="space-y-2 text-stone-500 font-medium text-sm">
                 <li className="flex items-center gap-2 justify-center md:justify-start"><Icons.Check /> Automatic relationship mapping</li>
@@ -181,7 +198,7 @@ export default function LandingPage() {
               </ul>
             </div>
             <div className="flex-1 w-full">
-              {/* Use the Nice Tree Mockup inside a container */}
+              {/* Tree Mockup Container */}
               <div className="bg-stone-900 rounded-[3rem] p-8 md:p-12 relative overflow-hidden shadow-2xl transform rotate-1 hover:rotate-0 transition-all duration-500 min-h-[400px] flex items-center justify-center">
                 <div className="absolute inset-0 opacity-20" style={{ backgroundImage: `radial-gradient(#fff 1px, transparent 1px)`, backgroundSize: '20px 20px' }}></div>
                 <div className="scale-110"><TreeMockup /></div>
@@ -192,30 +209,96 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* --- FEATURE SHOWCASE: Bento Grid --- */}
-      <section className="py-24 px-4">
+      {/* --- FEATURE SHOWCASE: Bento Grid (Updated Features) --- */}
+      <section id="features" className="py-24 px-4 bg-white border-y border-stone-200">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <h2 className="text-3xl font-serif font-bold text-stone-900 mb-4">Built for the modern historian.</h2>
+            <p className="text-stone-500">Traditional software is clunky. Linea is designed to be invisible, letting you focus on the story.</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+            {/* Feature 1: RAG */}
+            <div className="p-8 rounded-3xl bg-stone-50 border border-stone-200 hover:border-stone-300 transition-colors group">
+              <div className="w-12 h-12 rounded-2xl bg-white border border-stone-100 flex items-center justify-center mb-6 shadow-sm group-hover:scale-110 transition-transform">
+                <Icons.Brain />
+              </div>
+              <h3 className="text-lg font-bold text-stone-900 mb-2">Contextual Memory</h3>
+              <p className="text-sm text-stone-600 leading-relaxed">
+                Add family members vaguely over time. The AI remembers context and fills in the family tree gaps automatically.
+              </p>
+            </div>
+
+            {/* Feature 2: Privacy (NEW) */}
+            <div className="p-8 rounded-3xl bg-stone-50 border border-stone-200 hover:border-stone-300 transition-colors group">
+              <div className="w-12 h-12 rounded-2xl bg-white border border-stone-100 flex items-center justify-center mb-6 shadow-sm group-hover:scale-110 transition-transform">
+                <Icons.Lock />
+              </div>
+              <h3 className="text-lg font-bold text-stone-900 mb-2">Private & Secure</h3>
+              <p className="text-sm text-stone-600 leading-relaxed">
+                Your data is yours. We encrypt your history and do not sell your family data to insurance companies.
+              </p>
+            </div>
+
+            {/* Feature 3: Export (NEW) */}
+            <div className="p-8 rounded-3xl bg-stone-50 border border-stone-200 hover:border-stone-300 transition-colors group">
+              <div className="w-12 h-12 rounded-2xl bg-white border border-stone-100 flex items-center justify-center mb-6 shadow-sm group-hover:scale-110 transition-transform">
+                <svg className="w-5 h-5 text-stone-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+              </div>
+              <h3 className="text-lg font-bold text-stone-900 mb-2">GEDCOM Export</h3>
+              <p className="text-sm text-stone-600 leading-relaxed">
+                Don't get locked in. Export your entire tree to a standard GEDCOM file anytime to use with other software.
+              </p>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* --- CTA / JOIN WAITLIST (Cleaned up) --- */}
+      <section id="join" className="py-24 px-4">
         <div className="max-w-5xl mx-auto bg-stone-900 rounded-[3rem] p-12 md:p-20 text-center relative overflow-hidden">
 
-          {/* Decorative circles */}
+          {/* Decorative circles (Kept original) */}
           <div className="absolute top-0 left-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
           <div className="absolute bottom-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
 
           <div className="relative z-10 space-y-8">
             <h2 className="text-4xl md:text-6xl font-serif text-white leading-tight">
-              Your ancestors are waiting.
+              Preserve your legacy.
             </h2>
             <p className="text-stone-400 text-lg max-w-xl mx-auto">
-              Join 10,000+ families preserving their legacy with Linea.
-              Start building your tree today—free forever for your first 50 relatives.
+              We haven't released Linea to the public yet. Join the waitlist to secure your spot in the Alpha.
             </p>
-            <button className="px-10 py-5 bg-white text-stone-900 rounded-full font-bold text-xl shadow-2xl hover:bg-amber-50 transition-colors">
-              Create Free Account
-            </button>
-            <p className="text-stone-500 text-xs font-medium">No credit card required.</p>
+
+            {/* Functional Input Form */}
+            <form onSubmit={(e) => { e.preventDefault(); setJoined(true); }} className="max-w-md mx-auto flex flex-col sm:flex-row gap-3">
+              {!joined ? (
+                <>
+                  <input
+                    type="email"
+                    placeholder="name@example.com"
+                    className="flex-1 px-6 py-4 rounded-full bg-white/10 border border-white/20 text-white placeholder-stone-500 focus:outline-none focus:bg-white/20 transition-all"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                  <button type="submit" className="px-8 py-4 bg-white text-stone-900 rounded-full font-bold shadow-lg hover:bg-stone-200 transition-colors">
+                    Join Waitlist
+                  </button>
+                </>
+              ) : (
+                <div className="w-full bg-emerald-900/50 border border-emerald-800 text-emerald-100 px-6 py-4 rounded-full font-bold animate-fade-in-up">
+                  You're on the list! We'll be in touch.
+                </div>
+              )}
+            </form>
+            <p className="text-stone-500 text-xs font-medium">No credit card required. No spam.</p>
           </div>
         </div>
       </section>
-   
+
       {/* --- FOOTER --- */}
       <footer className="bg-stone-50 pt-20 pb-10 px-4 border-t border-stone-200">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
