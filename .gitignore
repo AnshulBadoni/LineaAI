@@ -1,1 +1,6 @@
 .venv
+server/.env
+server/frontend/.env
+server/frontend/.next
+server/frontend/node_modules
+server/frontend/.vercel
