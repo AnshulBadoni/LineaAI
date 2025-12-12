@@ -6,16 +6,13 @@ uvicorn==0.27.0
 neo4j==5.17.0
 
 # Settings
-pydantic==2.5.3
-pydantic-settings==2.1.0
+pydantic>=2.7.0
+pydantic-settings>=2.2.1
 python-dotenv==1.0.0
 
 # HTTP requests (for Pollinations API)
 requests==2.31.0
 httpx==0.26.0
 
-# Optional: Pollinations library (will fallback to direct API if not installed)
-# pollinations>=0.1.0
-
 # Async support
-aiohttp==3.9.1
+aiohttp>=3.10.2
