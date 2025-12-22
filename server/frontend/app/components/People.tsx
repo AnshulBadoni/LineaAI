@@ -1,11 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { ApiNode, Person, ApiEdge, ProcessedFamily, MarriageConnection, FamilyNode } from "../types";
 import { PlayfulGridCard } from "./PlayfulGridCard";
 import { Icons } from "../utility";
-import { CoupleNode } from "./CoupleNode";
-import { PersonAvatar } from "./PersonAvatar";
 import { ViewToggle } from "./ViewToggle";
 import { AddPersonCard } from "./AddPersonCard";
 import { CombinedFamilyView } from "./CombinedFamilyView";
@@ -13,7 +11,7 @@ import { CompactListRow } from "./CompactListRow";
 import { SeparateFamilyView } from "./SeparateFamilyView";
 
 
-// --- 3. DATA PROCESSING ---
+// --- DATA PROCESSING ---
 
 const formatPerson = (node: ApiNode, relation: string = "Family Member", generation?: number): Person => ({
     id: node.id,
@@ -22,8 +20,8 @@ const formatPerson = (node: ApiNode, relation: string = "Family Member", generat
     lastName: node.data.lastName,
     relation: relation,
     birthYear: node.data.birthDate ? node.data.birthDate.split('-')[0] : "????",
-    deathYear: node.data.deathDate && node.data.deathDate !== "0001-01-01"
-        ? node.data.deathDate.split('-')[0]
+    deathYear: node.data.deathDate
+        ? "Passed"
         : "Living",
     location: node.data.birthPlace || "Unknown",
     photoUrl: node.data.photoUrl || "",
@@ -62,11 +60,13 @@ function processGraphData(apiData: { nodes: ApiNode[], edges: ApiEdge[] }): {
     const childToParents = new Map<string, Set<string>>();
     const spouseMap = new Map<string, string>();
 
+    // Initialize maps for all nodes
     apiData.nodes.forEach(n => {
         parentToChildren.set(n.id, new Set());
         childToParents.set(n.id, new Set());
     });
 
+    // Process all edges
     apiData.edges.forEach(edge => {
         if (edge.type === "PARENT_OF") {
             parentToChildren.get(edge.source)?.add(edge.target);
@@ -84,59 +84,152 @@ function processGraphData(apiData: { nodes: ApiNode[], edges: ApiEdge[] }): {
         }
     });
 
-    // Find initial root nodes
-    let rootIds = apiData.nodes
+    // Infer spouse relationships from shared children
+    apiData.nodes.forEach(node => {
+        const parents = childToParents.get(node.id);
+        if (parents && parents.size >= 2) {
+            const parentArray = [...parents];
+            for (let i = 0; i < parentArray.length; i++) {
+                for (let j = i + 1; j < parentArray.length; j++) {
+                    const p1 = parentArray[i];
+                    const p2 = parentArray[j];
+                    if (!spouseMap.has(p1)) {
+                        spouseMap.set(p1, p2);
+                    }
+                    if (!spouseMap.has(p2)) {
+                        spouseMap.set(p2, p1);
+                    }
+                }
+            }
+        }
+    });
+
+    // =====================================================
+    // Helper: Get all children for a couple (both spouses)
+    // =====================================================
+    function getCoupleChildren(personId: string): Set<string> {
+        const childIds = new Set<string>(parentToChildren.get(personId) || []);
+
+        const spouseId = spouseMap.get(personId);
+        if (spouseId) {
+            const spouseChildren = parentToChildren.get(spouseId);
+            if (spouseChildren) {
+                spouseChildren.forEach(childId => childIds.add(childId));
+            }
+        }
+
+        return childIds;
+    }
+
+    // =====================================================
+    // Helper: Collect ALL family members starting from a person
+    // (includes descendants AND their spouses)
+    // =====================================================
+    function collectAllFamilyMembers(startId: string): Set<string> {
+        const members = new Set<string>();
+
+        function traverse(personId: string, visited = new Set<string>()) {
+            if (visited.has(personId)) return;
+            visited.add(personId);
+            members.add(personId);
+
+            // Include spouse
+            const spouseId = spouseMap.get(personId);
+            if (spouseId && !visited.has(spouseId)) {
+                members.add(spouseId);
+                visited.add(spouseId);
+            }
+
+            // Include all children from couple
+            const children = getCoupleChildren(personId);
+            children.forEach(childId => traverse(childId, visited));
+        }
+
+        traverse(startId);
+        return members;
+    }
+
+    // =====================================================
+    // Find and merge roots
+    // =====================================================
+
+    // Initial roots: people with no parents
+    let initialRootIds = apiData.nodes
         .filter(n => (childToParents.get(n.id)?.size ?? 0) === 0)
         .map(n => n.id);
 
-    // =====================================================
-    // NEW: Merge roots that share common children
-    // This fixes the issue where parents without SPOUSE_OF 
-    // edge create separate families
-    // =====================================================
-    function mergeRootsWithCommonChildren(initialRootIds: string[]): string[] {
-        const rootToRepresentative = new Map<string, string>();
+    console.log("Initial roots (no parents):", initialRootIds.map(id => nodeDataMap.get(id)?.label));
 
-        // Initially each root represents itself
-        initialRootIds.forEach(rootId => {
-            rootToRepresentative.set(rootId, rootId);
-        });
+    // Step 1: Merge roots that share common children (spouses at root level)
+    const rootToRepresentative = new Map<string, string>();
+    initialRootIds.forEach(rootId => {
+        rootToRepresentative.set(rootId, rootId);
+    });
 
-        // Find roots that are both parents of the same child
-        apiData.nodes.forEach(node => {
-            const parents = childToParents.get(node.id);
-            if (parents && parents.size > 1) {
-                const parentArray = [...parents];
-                const rootParents = parentArray.filter(p => initialRootIds.includes(p));
+    apiData.nodes.forEach(node => {
+        const parents = childToParents.get(node.id);
+        if (parents && parents.size > 1) {
+            const parentArray = [...parents];
+            const rootParents = parentArray.filter(p => initialRootIds.includes(p));
 
-                if (rootParents.length > 1) {
-                    // These roots share a child - they're likely spouses
-                    const representative = rootParents[0];
-
-                    rootParents.slice(1).forEach(p => {
-                        rootToRepresentative.set(p, representative);
-
-                        // Add them as spouses if not already
-                        if (!spouseMap.has(p)) {
-                            spouseMap.set(p, representative);
-                        }
-                        if (!spouseMap.has(representative)) {
-                            spouseMap.set(representative, p);
-                        }
-                    });
+            if (rootParents.length > 1) {
+                // Find best representative (prefer male)
+                let representative = rootParents[0];
+                const maleParent = rootParents.find(p => {
+                    const node = nodeDataMap.get(p);
+                    return node?.data.gender === 'Male';
+                });
+                if (maleParent) {
+                    representative = maleParent;
                 }
+
+                rootParents.forEach(p => {
+                    if (p !== representative) {
+                        rootToRepresentative.set(p, representative);
+                        if (!spouseMap.has(p)) spouseMap.set(p, representative);
+                        if (!spouseMap.has(representative)) spouseMap.set(representative, p);
+                    }
+                });
             }
-        });
+        }
+    });
 
-        // Return unique representatives only
-        return [...new Set(initialRootIds.map(id => rootToRepresentative.get(id)!))];
-    }
+    let mergedRoots = [...new Set(initialRootIds.map(id => rootToRepresentative.get(id)!))];
+    console.log("After merging spouse-roots:", mergedRoots.map(id => nodeDataMap.get(id)?.label));
 
-    // Apply the merge - THIS IS THE KEY LINE!
-    rootIds = mergeRootsWithCommonChildren(rootIds);
+    // =====================================================
+    // Step 2: Remove roots that are MEMBERS of another root's family
+    // (This handles the case where someone married into a family)
     // =====================================================
 
+    // Collect family members for each potential root
+    const rootFamilyMembers = new Map<string, Set<string>>();
+    mergedRoots.forEach(rootId => {
+        rootFamilyMembers.set(rootId, collectAllFamilyMembers(rootId));
+    });
+
+    // Debug: Show family members for each root
+    rootFamilyMembers.forEach((members, rootId) => {
+        console.log(`Family of ${nodeDataMap.get(rootId)?.label}:`,
+            [...members].map(id => nodeDataMap.get(id)?.label));
+    });
+
+    // Filter: Keep only roots that are NOT members of another root's family
+    const finalRoots = mergedRoots.filter(rootId => {
+        for (const [otherRootId, members] of rootFamilyMembers) {
+            if (otherRootId !== rootId && members.has(rootId)) {
+                console.log(`Excluding ${nodeDataMap.get(rootId)?.label} - already in ${nodeDataMap.get(otherRootId)?.label}'s family`);
+                return false;
+            }
+        }
+        return true;
+    });
+
+    console.log("Final roots:", finalRoots.map(id => nodeDataMap.get(id)?.label));
+
+    // =====================================================
     // Calculate generations
+    // =====================================================
     const generations = new Map<string, number>();
 
     function assignGeneration(id: string, gen: number, visited = new Set<string>()) {
@@ -156,13 +249,15 @@ function processGraphData(apiData: { nodes: ApiNode[], edges: ApiEdge[] }): {
         }
 
         // Children get next generation
-        const children = parentToChildren.get(id);
-        if (children) {
-            children.forEach(childId => assignGeneration(childId, gen + 1, new Set(visited)));
-        }
+        const children = getCoupleChildren(id);
+        children.forEach(childId => {
+            if (!visited.has(childId)) {
+                assignGeneration(childId, gen + 1, new Set(visited));
+            }
+        });
     }
 
-    rootIds.forEach(rootId => assignGeneration(rootId, 0));
+    finalRoots.forEach(rootId => assignGeneration(rootId, 0));
 
     // Create Person objects with generations
     const allNodes = new Map<string, Person>();
@@ -171,7 +266,9 @@ function processGraphData(apiData: { nodes: ApiNode[], edges: ApiEdge[] }): {
         allNodes.set(node.id, formatPerson(node, "Family Member", gen));
     });
 
+    // =====================================================
     // Build family structures
+    // =====================================================
     const personToFamily = new Map<string, string>();
 
     function getFamilyName(id: string): string {
@@ -182,25 +279,42 @@ function processGraphData(apiData: { nodes: ApiNode[], edges: ApiEdge[] }): {
     function getTreeDepth(id: string, visited = new Set<string>()): number {
         if (visited.has(id)) return 0;
         visited.add(id);
-        const children = parentToChildren.get(id);
-        if (!children || children.size === 0) return 1;
+
+        const spouseId = spouseMap.get(id);
+        if (spouseId) visited.add(spouseId);
+
+        const childIds = getCoupleChildren(id);
+        if (childIds.size === 0) return 1;
+
         let maxDepth = 0;
-        children.forEach(childId => {
-            maxDepth = Math.max(maxDepth, getTreeDepth(childId, new Set(visited)));
+        childIds.forEach(childId => {
+            if (!visited.has(childId)) {
+                maxDepth = Math.max(maxDepth, getTreeDepth(childId, new Set(visited)));
+            }
         });
+
         return 1 + maxDepth;
     }
 
     function countMembers(id: string, visited = new Set<string>()): number {
         if (visited.has(id)) return 0;
         visited.add(id);
+
         let count = 1;
-        const children = parentToChildren.get(id);
-        if (children) {
-            children.forEach(childId => {
-                count += countMembers(childId, new Set(visited));
-            });
+
+        const spouseId = spouseMap.get(id);
+        if (spouseId && !visited.has(spouseId)) {
+            count++;
+            visited.add(spouseId);
         }
+
+        const childIds = getCoupleChildren(id);
+        childIds.forEach(childId => {
+            if (!visited.has(childId)) {
+                count += countMembers(childId, new Set(visited));
+            }
+        });
+
         return count;
     }
 
@@ -227,8 +341,10 @@ function processGraphData(apiData: { nodes: ApiNode[], edges: ApiEdge[] }): {
             }
         }
 
-        // Add children sorted by birth year
-        const childIds = parentToChildren.get(id) || new Set();
+        // Get merged children from both spouses
+        const childIds = getCoupleChildren(id);
+
+        // Sort children by birth year
         const sortedChildren = [...childIds].sort((a, b) => {
             const nodeA = nodeDataMap.get(a);
             const nodeB = nodeDataMap.get(b);
@@ -249,9 +365,10 @@ function processGraphData(apiData: { nodes: ApiNode[], edges: ApiEdge[] }): {
         return node;
     }
 
+    // Build all families
     const families: ProcessedFamily[] = [];
 
-    rootIds.forEach(rootId => {
+    finalRoots.forEach(rootId => {
         const familyName = getFamilyName(rootId);
         const root = buildFamilyNode(rootId);
 
@@ -268,20 +385,23 @@ function processGraphData(apiData: { nodes: ApiNode[], edges: ApiEdge[] }): {
 
     families.sort((a, b) => b.memberCount - a.memberCount);
 
-    // Find marriage connections between families
+    // =====================================================
+    // Find marriage connections between different families
+    // =====================================================
     const marriageConnections: MarriageConnection[] = [];
 
-    rootIds.forEach(rootId => {
+    finalRoots.forEach(rootId => {
         const familyName = getFamilyName(rootId);
+
         function markFamily(id: string, visited = new Set<string>()) {
             if (visited.has(id)) return;
             visited.add(id);
             personToFamily.set(id, familyName);
-            const children = parentToChildren.get(id);
-            if (children) {
-                children.forEach(childId => markFamily(childId, visited));
-            }
+
+            const children = getCoupleChildren(id);
+            children.forEach(childId => markFamily(childId, visited));
         }
+
         markFamily(rootId);
     });
 
@@ -311,6 +431,16 @@ function processGraphData(apiData: { nodes: ApiNode[], edges: ApiEdge[] }): {
         }
     });
 
+    // Final debug output
+    console.log("=== FINAL TREE STRUCTURE ===");
+    families.forEach(f => {
+        console.log(`Family: ${f.name}`);
+        console.log(`  Members: ${f.memberCount}`);
+        console.log(`  Generations: ${f.generations}`);
+        console.log(`  Root: ${f.root.person.name}${f.root.spouse ? ` + ${f.root.spouse.name}` : ''}`);
+        console.log(`  Children: ${f.root.children.map(c => c.person.name).join(', ')}`);
+    });
+
     return {
         families,
         allNodes,
@@ -322,6 +452,9 @@ function processGraphData(apiData: { nodes: ApiNode[], edges: ApiEdge[] }): {
     };
 }
 
+
+// --- MAIN COMPONENT ---
+
 export default function PeopleDirectory() {
     const [viewMode, setViewMode] = useState<"combined" | "tree" | "grid" | "list">("combined");
     const [search, setSearch] = useState("");
@@ -329,13 +462,18 @@ export default function PeopleDirectory() {
     const [families, setFamilies] = useState<ProcessedFamily[]>([]);
     const [marriageConnections, setMarriageConnections] = useState<MarriageConnection[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL + '/api/persons' || "http://localhost:8000/api/persons";
+    const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL
+        ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/persons`
+        : "http://localhost:8000/api/persons";
 
     useEffect(() => {
         const fetchData = async () => {
             try {
                 setLoading(true);
+                setError(null);
+
                 const [peopleRes, treeRes] = await Promise.all([
                     fetch(`${API_BASE}/`),
                     fetch(`${API_BASE}/tree`)
@@ -345,13 +483,16 @@ export default function PeopleDirectory() {
 
                 if (treeRes.ok) {
                     const rawTree = await treeRes.json();
+                    console.log("Raw tree data received:", rawTree);
                     processedData = processGraphData(rawTree);
                     setFamilies(processedData.families);
                     setMarriageConnections(processedData.marriageConnections);
+                } else {
+                    console.warn("Tree API failed:", treeRes.status);
                 }
 
                 if (peopleRes.ok) {
-                    const rawPeople: ApiNode['data'] & { id: string }[] = await peopleRes.json();
+                    const rawPeople: (ApiNode['data'] & { id: string })[] = await peopleRes.json();
                     const formatted: Person[] = rawPeople.map((p: any) => ({
                         id: p.id,
                         name: `${p.firstName} ${p.lastName}`.trim(),
@@ -359,7 +500,9 @@ export default function PeopleDirectory() {
                         lastName: p.lastName,
                         relation: "Family Member",
                         birthYear: p.birthDate ? p.birthDate.split('-')[0] : "????",
-                        deathYear: p.deathDate && p.deathDate !== "0001-01-01" ? p.deathDate.split('-')[0] : "Living",
+                        deathYear: p.deathDate
+                            ? 'Passed'
+                            : "Living",
                         location: p.birthPlace || "Unknown",
                         photoUrl: p.photoUrl || "",
                         occupation: p.occupation || "",
@@ -368,27 +511,36 @@ export default function PeopleDirectory() {
                         generation: processedData?.generations.get(p.id)
                     }));
                     setPeople(formatted);
+                } else {
+                    console.warn("People API failed:", peopleRes.status);
                 }
             } catch (err) {
                 console.error("Fetch error:", err);
+                setError(err instanceof Error ? err.message : "Failed to load data");
             } finally {
                 setLoading(false);
             }
         };
+
         fetchData();
-    }, []);
+    }, [API_BASE]);
 
-    const filteredPeople = people.filter(p =>
-        p.name.toLowerCase().includes(search.toLowerCase())
-    );
+    const filteredPeople = useMemo(() => {
+        return people.filter(p =>
+            p.name.toLowerCase().includes(search.toLowerCase()) ||
+            p.location.toLowerCase().includes(search.toLowerCase()) ||
+            p.occupation.toLowerCase().includes(search.toLowerCase())
+        );
+    }, [people, search]);
 
-    // Sort by generation for list/grid views
-    const sortedPeople = [...filteredPeople].sort((a, b) => {
-        const genA = a.generation ?? 999;
-        const genB = b.generation ?? 999;
-        if (genA !== genB) return genA - genB;
-        return a.name.localeCompare(b.name);
-    });
+    const sortedPeople = useMemo(() => {
+        return [...filteredPeople].sort((a, b) => {
+            const genA = a.generation ?? 999;
+            const genB = b.generation ?? 999;
+            if (genA !== genB) return genA - genB;
+            return a.name.localeCompare(b.name);
+        });
+    }, [filteredPeople]);
 
     return (
         <div className="w-screen min-h-screen pb-24 pt-6 px-2 sm:px-6">
@@ -409,12 +561,37 @@ export default function PeopleDirectory() {
                                 placeholder="Search relatives..."
                                 className="flex-1 bg-transparent border-none outline-none text-stone-800 placeholder:text-stone-400 px-3 py-3.5 font-medium"
                             />
+                            {search && (
+                                <button
+                                    onClick={() => setSearch("")}
+                                    className="pr-4 text-stone-400 hover:text-stone-600"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            )}
                         </div>
                     </div>
 
                     {/* View Toggle */}
                     <ViewToggle viewMode={viewMode} onViewChange={(v) => setViewMode(v as any)} />
                 </div>
+
+                {/* Stats Bar */}
+                {!loading && (
+                    <div className="flex gap-4 text-sm text-stone-500">
+                        <span>{people.length} people</span>
+                        <span>•</span>
+                        <span>{families.length} {families.length === 1 ? 'family' : 'families'}</span>
+                        {families.length > 0 && (
+                            <>
+                                <span>•</span>
+                                <span>{families.reduce((sum, f) => sum + f.generations, 0)} generations total</span>
+                            </>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Content */}
@@ -424,9 +601,25 @@ export default function PeopleDirectory() {
                         <Icons.Loading />
                         <p className="text-stone-500 font-medium">Loading your ancestry...</p>
                     </div>
+                ) : error ? (
+                    <div className="flex flex-col items-center justify-center py-24 gap-4 animate-fade-in">
+                        <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
+                            <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                        </div>
+                        <p className="text-stone-700 font-medium">Failed to load data</p>
+                        <p className="text-stone-500 text-sm">{error}</p>
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="mt-2 px-4 py-2 bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors"
+                        >
+                            Retry
+                        </button>
+                    </div>
                 ) : (
                     <>
-                        {/* Combined View - All families in one */}
+                        {/* Combined View */}
                         {viewMode === "combined" && (
                             <CombinedFamilyView
                                 families={families}
@@ -434,7 +627,7 @@ export default function PeopleDirectory() {
                             />
                         )}
 
-                        {/* Separate Tree View - With tabs */}
+                        {/* Separate Tree View */}
                         {viewMode === "tree" && (
                             <SeparateFamilyView
                                 families={families}
@@ -449,13 +642,21 @@ export default function PeopleDirectory() {
                                 {sortedPeople.map((person) => (
                                     <PlayfulGridCard key={person.id} person={person} />
                                 ))}
+                                {sortedPeople.length === 0 && search && (
+                                    <div className="col-span-full py-12 text-center text-stone-500">
+                                        No results found for "{search}"
+                                    </div>
+                                )}
                             </div>
                         )}
 
                         {/* List View */}
                         {viewMode === "list" && (
                             <div className="flex flex-col gap-3 animate-fade-in">
-                                <a href="/admin/create" className="flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed border-stone-300 hover:border-amber-400 hover:bg-amber-50/20 transition-all text-stone-500 justify-center cursor-pointer group">
+                                <a
+                                    href="/admin/create"
+                                    className="flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed border-stone-300 hover:border-amber-400 hover:bg-amber-50/20 transition-all text-stone-500 justify-center cursor-pointer group"
+                                >
                                     <div className="w-10 h-10 rounded-xl bg-stone-100 flex items-center justify-center text-stone-400 group-hover:bg-amber-100 group-hover:text-amber-600 transition-colors">
                                         <Icons.Plus />
                                     </div>
@@ -464,17 +665,50 @@ export default function PeopleDirectory() {
                                 {sortedPeople.map((person) => (
                                     <CompactListRow key={person.id} person={person} />
                                 ))}
+                                {sortedPeople.length === 0 && search && (
+                                    <div className="py-12 text-center text-stone-500">
+                                        No results found for "{search}"
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Empty State */}
+                        {people.length === 0 && !search && (
+                            <div className="flex flex-col items-center justify-center py-24 gap-4">
+                                <div className="w-20 h-20 rounded-full bg-stone-100 flex items-center justify-center">
+                                    <svg className="w-10 h-10 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                </div>
+                                <h3 className="text-lg font-serif font-bold text-stone-700">No family members yet</h3>
+                                <p className="text-stone-500 text-sm">Start building your family tree by adding the first person</p>
+                                <a
+                                    href="/admin/create"
+                                    className="mt-2 px-6 py-3 bg-stone-900 text-white rounded-xl hover:bg-stone-800 transition-colors font-medium flex items-center gap-2"
+                                >
+                                    <Icons.Plus />
+                                    Add First Person
+                                </a>
                             </div>
                         )}
                     </>
                 )}
             </div>
 
+            {/* Mobile FAB */}
+            <a
+                href="/admin/create"
+                className="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-stone-900 text-white rounded-2xl shadow-2xl shadow-stone-900/30 flex items-center justify-center z-50 hover:scale-105 active:scale-95 transition-transform"
+            >
+                <Icons.Plus />
+            </a>
+
             {/* CSS */}
             <style jsx global>{`
                 @keyframes fade-in {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
+                    from { opacity: 0; transform: translateY(8px); }
+                    to { opacity: 1; transform: translateY(0); }
                 }
                 
                 .animate-fade-in {

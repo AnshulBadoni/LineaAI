@@ -1,6 +1,3 @@
-
-// --- 1. TYPES ---
-
 export interface ApiNode {
     id: string;
     label: string;
