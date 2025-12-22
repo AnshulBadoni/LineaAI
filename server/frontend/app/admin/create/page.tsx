@@ -1,22 +1,8 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-
-// --- TYPES ---
-interface Person {
-    id: string;
-    firstName: string;
-    lastName: string;
-    birthDate: string;
-}
-
-interface RelationshipItem {
-    person: Person;
-    type: string;
-    label: string;
-    marriageDate?: string;
-}
+import { Person, RelationshipItem } from "@/app/types";
 
 const REL_TYPES = [
     { label: "Parent of", value: "PARENT_OF" },
@@ -27,7 +13,7 @@ const REL_TYPES = [
     { label: "Step-Parent of", value: "STEP_PARENT_OF" },
 ];
 
-// --- ICONS (same as home) ---
+// --- ICONS ---
 const Icons = {
     Back: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>,
     Upload: () => <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
@@ -40,7 +26,7 @@ const Icons = {
     Calendar: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
 };
 
-// --- NAV PILL (same as home) ---
+// --- NAV PILL ---
 const NavigationPill = ({ onBack, onSave, saving, canSave }: {
     onBack: () => void;
     onSave: () => void;
@@ -102,9 +88,9 @@ export default function CreatePersonPage() {
             }
         } catch (err) {
             console.error(err);
-
         }
     }
+
     // --- HANDLERS ---
     const addRelationship = (person: Person) => {
         if (relationships.some(r => r.person.id === person.id)) return;
@@ -164,12 +150,13 @@ export default function CreatePersonPage() {
     };
 
     return (
-        <div className="h-dvh bg-stone-50 font-sans text-stone-900 overflow-hidden relative flex flex-col selection:bg-amber-100">
+        // CHANGED: Removed h-dvh and overflow-hidden on mobile. Added lg:h-dvh lg:overflow-hidden to restore desktop app feel.
+        <div className="min-h-dvh lg:h-dvh bg-stone-50 font-sans text-stone-900 lg:overflow-hidden relative flex flex-col selection:bg-amber-100">
 
-            {/* Background Ambience - Same as home */}
-            <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
-                <div className="absolute -top-[20%] -right-[10%] w-[600px] h-[600px] rounded-full bg-linear-to-b from-amber-100/40 to-transparent blur-[100px]" />
-                <div className="absolute top-[40%] -left-[10%] w-[400px] h-[400px] rounded-full bg-linear-to-b from-stone-200/40 to-transparent blur-[80px]" />
+            {/* Background Ambience - CHANGED: absolute -> fixed so it covers scrollable mobile area */}
+            <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+                <div className="absolute -top-[20%] -right-[10%] w-[600px] h-[600px] rounded-full bg-gradient-to-b from-amber-100/40 to-transparent blur-[100px]" />
+                <div className="absolute top-[40%] -left-[10%] w-[400px] h-[400px] rounded-full bg-gradient-to-b from-stone-200/40 to-transparent blur-[80px]" />
             </div>
 
             {/* Navigation Pill */}
@@ -177,22 +164,23 @@ export default function CreatePersonPage() {
                 onBack={() => router.push("/home")}
                 onSave={handleSubmit}
                 saving={isSubmitting}
-                canSave={canSave?.length > 0}
+                canSave={!!canSave}
             />
 
-            {/* Main Content */}
-            <main className="flex-1 relative z-10 pt-24 pb-6 px-4 sm:px-6 lg:px-8 overflow-hidden">
-                <div className="max-w-6xl mx-auto h-full">
+            {/* Main Content - CHANGED: Overflow handling is now conditional for desktop */}
+            <main className="flex-1 relative z-10 pt-24 pb-6 px-4 sm:px-6 lg:px-8 lg:overflow-hidden">
+                <div className="max-w-6xl mx-auto h-auto lg:h-full">
 
-                    <form className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                    {/* Form Layout - CHANGED: h-full is now lg:h-full */}
+                    <form className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:h-full">
 
                         {/* --- LEFT: IDENTITY CARD --- */}
-                        <div className="lg:col-span-4 flex flex-col">
-                            <div className="bg-white border border-stone-200 rounded-2xl shadow-sm flex flex-col h-full overflow-hidden">
+                        <div className="lg:col-span-4 flex flex-col lg:h-full">
+                            {/* CHANGED: h-full -> lg:h-full */}
+                            <div className="bg-white border border-stone-200 rounded-2xl shadow-sm flex flex-col lg:h-full overflow-hidden">
 
-                                {/* Card Header - Like AI message */}
-                                <div className="px-5 py-4 border-b border-stone-100 flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-l inear-to-br from-amber-100 to-orange-50 flex items-center justify-center border border-amber-200/50 shadow-sm">
+                                <div className="px-5 py-4 border-b border-stone-100 flex items-center gap-3 shrink-0">
+                                    <div className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center border border-amber-200/50 shadow-sm">
                                         <Icons.User />
                                     </div>
                                     <div>
@@ -201,32 +189,8 @@ export default function CreatePersonPage() {
                                     </div>
                                 </div>
 
-                                {/* Card Content */}
-                                <div className="flex-1 p-5 flex flex-col gap-4 overflow-y-auto">
-
-                                    {/* Photo Upload */}
-                                    {/* <div
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className={`relative w-full aspect-square max-w-[140px] mx-auto rounded-2xl border-2 border-dashed cursor-pointer overflow-hidden transition-all duration-300 group ${photoPreview
-                                            ? 'border-transparent shadow-lg'
-                                            : 'border-stone-200 hover:border-amber-300 bg-stone-50 hover:bg-amber-50/50'
-                                            }`}
-                                    >
-                                        {photoPreview ? (
-                                            <>
-                                                <img src={photoPreview} className="absolute inset-0 w-full h-full object-cover" alt="Preview" />
-                                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                                                    <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Change</span>
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <div className="w-full h-full flex flex-col items-center justify-center text-stone-400 group-hover:text-amber-600 transition-colors">
-                                                <Icons.Upload />
-                                                <span className="text-[10px] font-medium mt-2">Upload Photo</span>
-                                            </div>
-                                        )}
-                                        <input type="file" ref={fileInputRef} onChange={(e) => e.target.files?.[0] && setPhotoPreview(URL.createObjectURL(e.target.files[0]))} className="hidden" accept="image/*" />
-                                    </div> */}
+                                {/* Card Content - CHANGED: overflow-y-auto is now lg:overflow-y-auto */}
+                                <div className="flex-1 p-5 flex flex-col gap-4 lg:overflow-y-auto">
 
                                     {/* Name Fields */}
                                     <div className="space-y-3">
@@ -334,15 +298,14 @@ export default function CreatePersonPage() {
                         </div>
 
                         {/* --- RIGHT: CONNECTIONS & BIO --- */}
-                        <div className="lg:col-span-8 flex flex-col gap-5 h-full min-h-0">
+                        <div className="lg:col-span-8 flex flex-col gap-5 lg:h-full lg:min-h-0">
 
-                            {/* FAMILY CONNECTIONS */}
-                            <div className="bg-white border border-stone-200 rounded-2xl shadow-sm flex-1 flex flex-col min-h-0 overflow-hidden">
+                            {/* FAMILY CONNECTIONS - CHANGED: Flex and overflow handling */}
+                            <div className="bg-white border border-stone-200 rounded-2xl shadow-sm flex-1 flex flex-col lg:min-h-0 overflow-hidden">
 
-                                {/* Header */}
-                                <div className="px-5 py-4 border-b border-stone-100 flex items-center justify-between">
+                                <div className="px-5 py-4 border-b border-stone-100 flex items-center justify-between shrink-0">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-linear-to-br from-amber-100 to-orange-50 flex items-center justify-center border border-amber-200/50 shadow-sm text-amber-600">
+                                        <div className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center border border-amber-200/50 shadow-sm text-amber-600">
                                             <Icons.Link />
                                         </div>
                                         <div>
@@ -358,12 +321,12 @@ export default function CreatePersonPage() {
                                 </div>
 
                                 {/* Search Row */}
-                                <div className="px-5 py-4 border-b border-stone-50 bg-stone-50/50">
-                                    <div className="flex gap-3">
+                                <div className="px-5 py-4 border-b border-stone-50 bg-stone-50/50 shrink-0">
+                                    <div className="flex flex-col sm:flex-row gap-3">
                                         {/* Search Input */}
                                         <div className="flex-1 relative">
                                             <div className="relative group">
-                                                <div className="absolute -inset-0.5 bg-linear-to-r from-stone-200 via-amber-200/50 to-stone-200 rounded-xl opacity-0 group-focus-within:opacity-100 blur transition duration-300"></div>
+                                                <div className="absolute -inset-0.5 bg-gradient-to-r from-stone-200 via-amber-200/50 to-stone-200 rounded-xl opacity-0 group-focus-within:opacity-100 blur transition duration-300"></div>
                                                 <div className="relative flex items-center bg-white border border-stone-200 rounded-xl">
                                                     <span className="pl-3 text-stone-400"><Icons.Search /></span>
                                                     <input
@@ -371,7 +334,7 @@ export default function CreatePersonPage() {
                                                         placeholder="Search family members..."
                                                         value={searchQuery}
                                                         onChange={(e) => { setSearchQuery(e.target.value); setIsSearching(true); }}
-                                                        className="flex-1 bg-transparent px-3 py-2.5 text-sm font-medium placeholder:text-stone-400 focus:outline-none"
+                                                        className="flex-1 bg-transparent px-3 py-2.5 text-sm font-medium placeholder:text-stone-400 focus:outline-none w-full"
                                                     />
                                                 </div>
                                             </div>
@@ -386,7 +349,7 @@ export default function CreatePersonPage() {
                                                             className="px-4 py-2.5 hover:bg-amber-50 cursor-pointer flex justify-between items-center transition-colors"
                                                         >
                                                             <span className="font-medium text-stone-800 text-sm">{p.firstName} {p.lastName}</span>
-                                                            <span className="text-[10px] text-stone-400 bg-stone-100 px-2 py-0.5 rounded-md font-mono">{p.birthDate || '—'}</span>
+                                                            <span className="text-[10px] text-stone-400 bg-stone-100 px-2 py-0.5 rounded-md font-mono">{p.birthYear || '—'}</span>
                                                         </div>
                                                     )) : (
                                                         <div className="p-4 text-sm text-stone-400 text-center">No results found</div>
@@ -395,28 +358,30 @@ export default function CreatePersonPage() {
                                             )}
                                         </div>
 
-                                        {/* Relationship Type */}
-                                        <select
-                                            value={relationType}
-                                            onChange={(e) => setRelationType(e.target.value)}
-                                            className="bg-white border border-stone-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-200 cursor-pointer min-w-[130px]"
-                                        >
-                                            {REL_TYPES.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
-                                        </select>
+                                        <div className="flex gap-2">
+                                            {/* Relationship Type */}
+                                            <select
+                                                value={relationType}
+                                                onChange={(e) => setRelationType(e.target.value)}
+                                                className="bg-white border border-stone-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-200 cursor-pointer flex-1 sm:flex-none"
+                                            >
+                                                {REL_TYPES.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
+                                            </select>
 
-                                        {relationType === "MARRIED_TO" && (
-                                            <input
-                                                type="date"
-                                                value={marriageDate}
-                                                onChange={(e) => setMarriageDate(e.target.value)}
-                                                className="bg-white border border-stone-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-200"
-                                            />
-                                        )}
+                                            {relationType === "MARRIED_TO" && (
+                                                <input
+                                                    type="date"
+                                                    value={marriageDate}
+                                                    onChange={(e) => setMarriageDate(e.target.value)}
+                                                    className="bg-white border border-stone-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-200"
+                                                />
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Relationships List */}
-                                <div className="flex-1 overflow-y-auto p-4 min-h-0">
+                                {/* Relationships List - CHANGED: lg:overflow-y-auto */}
+                                <div className="flex-1 lg:overflow-y-auto p-4 lg:min-h-0">
                                     {relationships.length > 0 ? (
                                         <div className="space-y-2">
                                             {relationships.map((rel, idx) => (
@@ -425,21 +390,24 @@ export default function CreatePersonPage() {
                                                     className="flex items-center justify-between bg-stone-50 hover:bg-amber-50/50 p-3 rounded-xl transition-colors group"
                                                 >
                                                     <div className="flex items-center gap-3">
-                                                        <span className="px-2 py-1 bg-white border border-stone-200 rounded-lg text-[10px] font-bold uppercase text-stone-500 tracking-wide shadow-sm">
+                                                        <span className="px-2 py-1 bg-white border border-stone-200 rounded-lg text-[10px] font-bold uppercase text-stone-500 tracking-wide shadow-sm hidden sm:inline-block">
                                                             {rel.label}
                                                         </span>
-                                                        <span className="font-medium text-stone-900 text-sm">{rel.person.firstName} {rel.person.lastName}</span>
+                                                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                                                            <span className="sm:hidden text-[10px] font-bold uppercase text-stone-500">{rel.label}</span>
+                                                            <span className="font-medium text-stone-900 text-sm">{rel.person.firstName} {rel.person.lastName}</span>
+                                                        </div>
                                                         {rel.marriageDate && (
                                                             <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full flex items-center gap-1">
                                                                 <Icons.Calendar />
-                                                                {rel.marriageDate}
+                                                                <span className="hidden sm:inline">{rel.marriageDate}</span>
                                                             </span>
                                                         )}
                                                     </div>
                                                     <button
                                                         type="button"
                                                         onClick={() => removeRelationship(rel.person.id)}
-                                                        className="p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                        className="p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
                                                     >
                                                         <Icons.X />
                                                     </button>
@@ -447,7 +415,7 @@ export default function CreatePersonPage() {
                                             ))}
                                         </div>
                                     ) : (
-                                        <div className="h-full flex items-center justify-center">
+                                        <div className="h-40 lg:h-full flex items-center justify-center">
                                             <div className="text-center">
                                                 <div className="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center mx-auto mb-3 text-stone-400">
                                                     <Icons.Link />
@@ -471,7 +439,7 @@ export default function CreatePersonPage() {
                                         name="bio"
                                         value={formData.bio}
                                         onChange={handleChange}
-                                        placeholder="Write a short story about this person. Where did they grow up? What were they known for?"
+                                        placeholder="Write a short story about this person..."
                                         className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-sm font-medium placeholder:text-stone-300 focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-300 resize-none leading-relaxed h-20 transition-all"
                                     />
                                 </div>
