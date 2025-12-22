@@ -58,3 +58,11 @@ export interface MarriageConnection {
     family1: string;
     family2: string;
 }
+
+
+export interface RelationshipItem {
+    person: Person;
+    type: string;
+    label: string;
+    marriageDate?: string;
+}
