@@ -230,21 +230,21 @@ const NavigationPill = ({
                     className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-300 flex items-center gap-2 ${activeTab === "chat" ? "bg-stone-100 text-stone-900 shadow-sm" : "hover:text-stone-200"}`}
                 >
                     <Icons.Chat />
-                    <span>Assistant</span>
+                    <span className="hidden sm:block">Assistant</span>
                 </button>
                 <button
                     onClick={() => onTabChange("tree")}
                     className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-300 flex items-center gap-2 ${activeTab === "tree" ? "bg-stone-100 text-stone-900 shadow-sm" : "hover:text-stone-200"}`}
                 >
                     <Icons.Tree />
-                    <span>Ancestry</span>
+                    <span className="hidden sm:block">Ancestry</span>
                 </button>
                 <Link
                     href={"https://anshulbadoni-portfolio.vercel.app/#contact"}
                     className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-300 flex items-center gap-2 ${activeTab === "feedback" ? "bg-stone-100 text-stone-900 shadow-sm" : "hover:text-stone-200"}`}
                 >
                     <Icons.Sparkles />
-                    <span>Feedback </span>
+                    <span className="hidden sm:block">Feedback </span>
                 </Link>
             </div>
         </div>
@@ -797,10 +797,10 @@ export default function Page() {
                                             </button>
                                         </div>
                                     </div>
-                                    <p className="text-center text-xs text-stone-400 mt-2">
+                                    {/* <p className="text-center text-xs text-stone-400 mt-2">
                                         Press Enter to send, Shift+Enter for new line
                                         {sessionId && <span className="text-amber-600 ml-2">• Conversation active</span>}
-                                    </p>
+                                    </p> */}
                                 </div>
                             </div>
                         </div>
