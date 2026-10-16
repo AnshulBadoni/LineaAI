@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from routers import persons, rag
-from database.neo4j_connection import db
+from database.postgres_connection import db
 
 # load environment variables
 from dotenv import load_dotenv
@@ -14,21 +14,15 @@ load_dotenv(".env")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # --- Startup ---
-    db.execute_write("CREATE INDEX person_id IF NOT EXISTS FOR (p:Person) ON (p.id)")
-    db.execute_write("CREATE INDEX person_name IF NOT EXISTS FOR (p:Person) ON (p.fullName)")
+    try:
+        db.init_db()
+        print("Connected to PostgreSQL and verified tables.")
+    except Exception as e:
+        print(f"Warning: Could not connect to PostgreSQL on startup: {e}")
 
     yield
 
     # --- Shutdown ---
-    def shutdown_handler(signal, frame):
-        print("Shutting down the application...")
-        db.close()
-        raise SystemExit
-
-    signal.signal(signal.SIGTERM, shutdown_handler)
-    signal.signal(signal.SIGINT, shutdown_handler)
-
-    await app.shutdown()
     db.close()
 
 
@@ -61,7 +55,7 @@ async def root():
 @app.get("/health")
 async def health_check():
     try:
-        db.execute_query("RETURN 1")
-        return {"status": "healthy", "database": "connected"}
+        db.execute_query("SELECT 1")
+        return {"status": "healthy", "database": "connected (PostgreSQL)"}
     except Exception as e:
         return {"status": "unhealthy", "error": str(e)}

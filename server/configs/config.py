@@ -17,10 +17,8 @@ class Settings(BaseSettings):
     # CORS
     cors_origins: List[str] = ["http://localhost:3000"]
     
-    # Neo4j settings
-    neo4j_uri: str = "neo4j://127.0.0.1:7687"
-    neo4j_user: str = "neo4j"
-    neo4j_password: str = "anshulbadoni"
+    # Database settings (PostgreSQL / Supabase)
+    database_url: str = "postgresql://postgres.udncaklmadjgakbjwdnh:anshulbadoni@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres"
     
     # AI settings (Pollinations - FREE, no API key needed!)
     ai_model: str = "openai"  # Options: openai, mistral, llama, claude, gemini

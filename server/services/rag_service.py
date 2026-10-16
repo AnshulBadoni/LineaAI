@@ -1,5 +1,5 @@
 # services/rag_service.py
-from database.neo4j_connection import db
+from database.postgres_connection import db
 from services.pollinations import PollinationsClient
 from services.conversation_memory import conversation_memory
 from configs.config import settings
@@ -33,10 +33,9 @@ Guidelines:
 
     def extract_mentioned_people(self, text: str, family_context: str) -> List[str]:
         """Extract names of people mentioned in the text"""
-        # Get all names from family context
         query = """
-        MATCH (p:Person)
-        RETURN p.fullName as name, p.firstName as firstName, p.lastName as lastName
+        SELECT full_name AS name, first_name AS "firstName", last_name AS "lastName"
+        FROM persons
         """
         results = db.execute_query(query)
         
@@ -44,17 +43,15 @@ Guidelines:
         text_lower = text.lower()
         
         for person in results:
-            if person['name'] and person['name'].lower() in text_lower:
+            if person.get('name') and person['name'].lower() in text_lower:
                 mentioned.append(person['name'])
-            elif person['firstName'] and person['firstName'].lower() in text_lower:
+            elif person.get('firstName') and person['firstName'].lower() in text_lower:
                 mentioned.append(person['name'])
         
-        return mentioned
+        return list(dict.fromkeys(mentioned))
 
     def resolve_references(self, question: str, session_id: str) -> str:
         """Resolve pronouns and references to actual names"""
-        
-        # Check if question contains references that need resolution
         reference_patterns = [
             r'\bhis\b', r'\bher\b', r'\btheir\b', r'\bhim\b', r'\bshe\b', r'\bhe\b',
             r'\bthat person\b', r'\bthe same\b', r'\bthis person\b',
@@ -63,18 +60,15 @@ Guidelines:
         ]
         
         has_reference = any(re.search(p, question.lower()) for p in reference_patterns)
-        
         if not has_reference:
             return question
         
-        # Get conversation history and last mentioned people
         history = self.memory.get_context_string(session_id, limit=4)
         last_mentioned = self.memory.get_last_mentioned_people(session_id)
         
         if not history and not last_mentioned:
             return question
         
-        # Use AI to resolve references
         resolve_prompt = f"""Given the conversation history and the new question, rewrite the question to be self-contained by replacing pronouns and references with actual names.
 
 {history}
@@ -99,20 +93,26 @@ Return ONLY the rewritten question, nothing else."""
     def get_family_context(self) -> str:
         """Retrieve all family data as context"""
         query = """
-        MATCH (p:Person)
-        OPTIONAL MATCH (p)-[:CHILD_OF]->(parent:Person)
-        OPTIONAL MATCH (p)-[:PARENT_OF]->(child:Person)
-        OPTIONAL MATCH (p)-[:SPOUSE_OF]->(spouse:Person)
-        RETURN p.fullName as name,
-               p.birthDate as birthDate,
-               p.deathDate as deathDate,
-               p.occupation as occupation,
-               p.bio as bio,
-               p.birthPlace as birthPlace,
-               p.gender as gender,
-               collect(DISTINCT parent.fullName) as parents,
-               collect(DISTINCT child.fullName) as children,
-               collect(DISTINCT spouse.fullName) as spouses
+        SELECT 
+            p.id,
+            p.full_name as name,
+            p.birth_date as "birthDate",
+            p.death_date as "deathDate",
+            p.occupation as occupation,
+            p.bio as bio,
+            p.birth_place as "birthPlace",
+            p.gender as gender,
+            COALESCE(ARRAY_AGG(DISTINCT parent.full_name) FILTER (WHERE parent.full_name IS NOT NULL), '{}') as parents,
+            COALESCE(ARRAY_AGG(DISTINCT child.full_name) FILTER (WHERE child.full_name IS NOT NULL), '{}') as children,
+            COALESCE(ARRAY_AGG(DISTINCT spouse.full_name) FILTER (WHERE spouse.full_name IS NOT NULL), '{}') as spouses
+        FROM persons p
+        LEFT JOIN relationships r_p ON p.id = r_p.from_person_id AND r_p.relationship_type = 'CHILD_OF'
+        LEFT JOIN persons parent ON r_p.to_person_id = parent.id
+        LEFT JOIN relationships r_c ON p.id = r_c.from_person_id AND r_c.relationship_type = 'PARENT_OF'
+        LEFT JOIN persons child ON r_c.to_person_id = child.id
+        LEFT JOIN relationships r_s ON p.id = r_s.from_person_id AND r_s.relationship_type = 'SPOUSE_OF'
+        LEFT JOIN persons spouse ON r_s.to_person_id = spouse.id
+        GROUP BY p.id;
         """
         
         results = db.execute_query(query)
@@ -121,34 +121,34 @@ Return ONLY the rewritten question, nothing else."""
         for person in results:
             info = f"**{person['name']}**"
             
-            if person['gender']:
+            if person.get('gender'):
                 info += f" ({person['gender']})"
             info += "\n"
             
-            if person['birthDate']:
+            if person.get('birthDate'):
                 info += f"  - Born: {person['birthDate']}"
-                if person['birthPlace']:
+                if person.get('birthPlace'):
                     info += f" in {person['birthPlace']}"
                 info += "\n"
             
-            if person['deathDate']:
+            if person.get('deathDate'):
                 info += f"  - Died: {person['deathDate']}\n"
             
-            if person['occupation']:
+            if person.get('occupation'):
                 info += f"  - Occupation: {person['occupation']}\n"
             
-            if person['bio']:
+            if person.get('bio'):
                 info += f"  - Bio: {person['bio']}\n"
             
-            parents = [p for p in person['parents'] if p]
+            parents = [p for p in (person.get('parents') or []) if p]
             if parents:
                 info += f"  - Parents: {', '.join(parents)}\n"
             
-            spouses = [s for s in person['spouses'] if s]
+            spouses = [s for s in (person.get('spouses') or []) if s]
             if spouses:
                 info += f"  - Spouse(s): {', '.join(spouses)}\n"
             
-            children = [c for c in person['children'] if c]
+            children = [c for c in (person.get('children') or []) if c]
             if children:
                 info += f"  - Children: {', '.join(children)}\n"
             
@@ -156,69 +156,57 @@ Return ONLY the rewritten question, nothing else."""
         
         return "\n".join(context_parts)
 
-    def generate_cypher_query(self, question: str) -> Optional[str]:
-        """Use AI to generate a Cypher query for the question"""
-        cypher_prompt = f"""You are a Neo4j Cypher expert. Generate a Cypher query to answer the following question about a family tree database.
+    def generate_sql_query(self, question: str) -> Optional[str]:
+        """Use AI to generate a PostgreSQL query for the question"""
+        sql_prompt = f"""You are a PostgreSQL expert. Generate a SQL SELECT query to answer the following question about a family tree database.
 
 Database Schema:
-- Node: Person
-- Properties: id, firstName, lastName, fullName, gender, birthDate, deathDate, birthPlace, occupation, bio
-- Relationships:
-  - PARENT_OF: parent -> child
-  - CHILD_OF: child -> parent
-  - SPOUSE_OF: person <-> person (bidirectional)
-  - SIBLING_OF: person <-> person (bidirectional)
+Table: persons
+Columns: id, first_name, last_name, full_name, gender, birth_date, death_date, birth_place, occupation, bio
+
+Table: relationships
+Columns: id, from_person_id, to_person_id, relationship_type, marriage_date
+Valid relationship_types: 'PARENT_OF', 'CHILD_OF', 'SPOUSE_OF', 'SIBLING_OF', 'ADOPTED_PARENT_OF', 'ADOPTED_CHILD_OF', 'STEP_PARENT_OF', 'STEP_CHILD_OF', 'DIVORCED_FROM'
 
 Question: {question}
 
-Return ONLY the Cypher query, nothing else. No explanation, no markdown formatting."""
+Return ONLY the raw SQL SELECT query, nothing else. No markdown, no explanations, no semicolon at the end."""
 
         try:
             response = self.client.generate_sync(
-                prompt=cypher_prompt,
-                system="You are a Cypher query generator. Return only valid Cypher queries.",
+                prompt=sql_prompt,
+                system="You are a SQL query generator. Return only valid PostgreSQL SELECT queries.",
             )
-            
             query = response.strip()
-            query = query.replace("```cypher", "").replace("```", "").strip()
-            
+            query = query.replace("```sql", "").replace("```", "").strip()
+            # Only allow SELECT queries
+            if not query.lower().startswith("select") and not query.lower().startswith("with"):
+                return None
             return query
         except Exception as e:
-            print(f"Error generating Cypher: {e}")
+            print(f"Error generating SQL: {e}")
             return None
 
-    def execute_cypher_for_question(self, question: str) -> str:
-        """Generate and execute Cypher query based on question"""
-        cypher_query = self.generate_cypher_query(question)
-        
-        if not cypher_query:
+    def execute_sql_for_question(self, question: str) -> str:
+        """Generate and execute SQL query based on question"""
+        sql_query = self.generate_sql_query(question)
+        if not sql_query:
             return "Could not generate query"
         
         try:
-            results = db.execute_query(cypher_query)
+            results = db.execute_query(sql_query)
             return json.dumps(results, default=str, indent=2)
         except Exception as e:
             return f"Query error: {str(e)}"
 
     def answer_question(self, question: str, session_id: Optional[str] = None) -> Dict:
         """Answer a question about the family tree using RAG with memory"""
-        
-        # Get or create session
         session_id = self.memory.get_or_create_session(session_id)
-        
-        # Resolve references in the question
         resolved_question = self.resolve_references(question, session_id)
-        
-        # Get family context
         family_context = self.get_family_context()
-        
-        # Try to get specific data via Cypher
-        specific_data = self.execute_cypher_for_question(resolved_question)
-        
-        # Get conversation history
+        specific_data = self.execute_sql_for_question(resolved_question)
         conversation_history = self.memory.get_context_string(session_id, limit=6)
         
-        # Build the prompt
         user_prompt = f"""Based on the following family information and our conversation, please answer the question.
 
 === FAMILY MEMBERS ===
@@ -242,10 +230,7 @@ Remember the context of our conversation when answering."""
                 system=self.system_prompt
             )
             
-            # Extract mentioned people for future reference resolution
             mentioned_people = self.extract_mentioned_people(response, family_context)
-            
-            # Store the conversation
             self.memory.add_message(session_id, "user", question, mentioned_people)
             self.memory.add_message(session_id, "assistant", response, mentioned_people)
             
@@ -268,15 +253,10 @@ Remember the context of our conversation when answering."""
 
     async def answer_question_async(self, question: str, session_id: Optional[str] = None) -> Dict:
         """Async version of answer_question"""
-        
-        # Get or create session
         session_id = self.memory.get_or_create_session(session_id)
-        
-        # Resolve references
         resolved_question = self.resolve_references(question, session_id)
-        
         family_context = self.get_family_context()
-        specific_data = self.execute_cypher_for_question(resolved_question)
+        specific_data = self.execute_sql_for_question(resolved_question)
         conversation_history = self.memory.get_context_string(session_id, limit=6)
         
         user_prompt = f"""Based on the following family information and our conversation, please answer the question.
@@ -301,10 +281,7 @@ Please provide a helpful, accurate, and friendly answer."""
                 system=self.system_prompt
             )
             
-            # Extract mentioned people
             mentioned_people = self.extract_mentioned_people(response, family_context)
-            
-            # Store conversation
             self.memory.add_message(session_id, "user", question, mentioned_people)
             self.memory.add_message(session_id, "assistant", response, mentioned_people)
             
@@ -328,38 +305,38 @@ Please provide a helpful, accurate, and friendly answer."""
     def get_relationship_explanation(self, person1_name: str, person2_name: str, 
                                       session_id: Optional[str] = None) -> Dict:
         """Explain the relationship between two people"""
+        from services.family_services import family_service
         
-        query = """
-        MATCH (p1:Person), (p2:Person)
-        WHERE toLower(p1.fullName) CONTAINS toLower($name1)
-          AND toLower(p2.fullName) CONTAINS toLower($name2)
-        MATCH path = shortestPath((p1)-[*]-(p2))
-        RETURN p1.fullName as person1,
-               p2.fullName as person2,
-               [node in nodes(path) | node.fullName] as pathNames,
-               [rel in relationships(path) | type(rel)] as relationships,
-               length(path) as distance
-        LIMIT 1
-        """
+        p1_list = db.execute_query(
+            "SELECT id, full_name FROM persons WHERE LOWER(full_name) LIKE %(name)s LIMIT 1",
+            {"name": f"%{person1_name.lower()}%"}
+        )
+        p2_list = db.execute_query(
+            "SELECT id, full_name FROM persons WHERE LOWER(full_name) LIKE %(name)s LIMIT 1",
+            {"name": f"%{person2_name.lower()}%"}
+        )
         
-        try:
-            results = db.execute_query(query, {"name1": person1_name, "name2": person2_name})
-        except Exception as e:
-            return {"error": f"Database error: {str(e)}"}
-        
-        if not results:
+        if not p1_list or not p2_list:
             return {
-                "error": f"Could not find relationship between '{person1_name}' and '{person2_name}'."
+                "error": f"Could not find one or both persons ('{person1_name}', '{person2_name}') in the database."
             }
         
-        result = results[0]
+        p1 = p1_list[0]
+        p2 = p2_list[0]
         
-        explain_prompt = f"""Explain the family relationship between {result['person1']} and {result['person2']}.
+        path_info = family_service.find_relationship(p1["id"], p2["id"])
+        if not path_info:
+            return {
+                "error": f"Could not find a relationship between '{p1['full_name']}' and '{p2['full_name']}'."
+            }
+        
+        distance = len(path_info["relationships"])
+        explain_prompt = f"""Explain the family relationship between {p1['full_name']} and {p2['full_name']}.
 
 The path through the family tree is:
-- People in path: {' → '.join(result['pathNames'])}
-- Relationship types: {' → '.join(result['relationships'])}
-- Distance: {result['distance']} step(s)
+- People in path: {' → '.join(path_info['names'])}
+- Relationship types: {' → '.join(path_info['relationships'])}
+- Distance: {distance} step(s)
 
 Provide a clear, natural language explanation of how they are related."""
 
@@ -369,33 +346,32 @@ Provide a clear, natural language explanation of how they are related."""
                 system="You are an expert at explaining family relationships clearly and concisely."
             )
             
-            # Store in memory if session provided
             if session_id:
                 session_id = self.memory.get_or_create_session(session_id)
                 self.memory.add_message(
                     session_id, "user", 
                     f"How are {person1_name} and {person2_name} related?",
-                    [result['person1'], result['person2']]
+                    [p1['full_name'], p2['full_name']]
                 )
                 self.memory.add_message(
                     session_id, "assistant", explanation,
-                    [result['person1'], result['person2']]
+                    [p1['full_name'], p2['full_name']]
                 )
             
             return {
-                "person1": result['person1'],
-                "person2": result['person2'],
-                "path": result['pathNames'],
-                "relationships": result['relationships'],
-                "distance": result['distance'],
+                "person1": p1['full_name'],
+                "person2": p2['full_name'],
+                "path": path_info['names'],
+                "relationships": path_info['relationships'],
+                "distance": distance,
                 "explanation": explanation,
                 "session_id": session_id,
                 "model": self.client.model
             }
         except Exception as e:
             return {
-                "person1": result['person1'],
-                "person2": result['person2'],
+                "person1": p1['full_name'],
+                "person2": p2['full_name'],
                 "explanation": f"Error generating explanation: {str(e)}",
                 "model": self.client.model
             }
@@ -418,14 +394,17 @@ Provide a clear, natural language explanation of how they are related."""
 
     def get_family_summary(self) -> Dict:
         """Get a summary of the entire family tree"""
-        # ... (keep existing implementation)
-        pass
+        count_persons = db.execute_query("SELECT COUNT(*) AS total FROM persons")[0]["total"]
+        count_rels = db.execute_query("SELECT COUNT(*) AS total FROM relationships")[0]["total"]
+        return {
+            "total_persons": count_persons,
+            "total_relationships": count_rels,
+            "database": "PostgreSQL (Supabase)"
+        }
 
     def suggest_questions(self) -> List[str]:
         """Suggest interesting questions users can ask"""
-        
         family_context = self.get_family_context()
-        
         prompt = f"""Based on this family tree, suggest 5 interesting questions that someone might want to ask about their family.
 
 === FAMILY MEMBERS ===
@@ -438,7 +417,6 @@ Return only the questions, one per line, without numbering."""
                 prompt=prompt,
                 system="You suggest interesting family history questions."
             )
-            
             questions = [q.strip() for q in response.split('\n') if q.strip()]
             return questions[:5]
         except:

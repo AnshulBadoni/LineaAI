@@ -467,7 +467,7 @@ export default function PeopleDirectory() {
     const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL
         ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/persons`
         : "http://localhost:8000/api/persons";
-
+    
     useEffect(() => {
         const fetchData = async () => {
             try {

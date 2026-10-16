@@ -2,8 +2,8 @@
 fastapi==0.109.0
 uvicorn==0.27.0
 
-# Neo4j
-neo4j==5.17.0
+# PostgreSQL
+psycopg2-binary>=2.9.9
 
 # Settings
 pydantic>=2.7.0
